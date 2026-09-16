@@ -402,6 +402,58 @@
     transform: translateX(-50%) translateY(0);
   }
 
+  /* ---------- Celebration overlay ---------- */
+  .celebrate-overlay {
+    position: fixed;
+    top: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 12px;
+    pointer-events: none;
+    opacity: 0;
+    z-index: 100;
+  }
+  .celebrate-overlay.show {
+    animation: celebrate-fade 1.3s ease forwards;
+  }
+  .celebrate-emoji {
+    font-size: 72px;
+    transform: scale(0.5);
+  }
+  .celebrate-overlay.show .celebrate-emoji {
+    animation: celebrate-pop 1.3s ease forwards;
+  }
+  .celebrate-text {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--plum);
+    background: white;
+    padding: 10px 22px;
+    border-radius: 30px;
+    box-shadow: 0 8px 24px rgba(43,38,64,0.18);
+  }
+
+  @keyframes celebrate-fade {
+    0%   { opacity: 0; }
+    15%  { opacity: 1; }
+    75%  { opacity: 1; }
+    100% { opacity: 0; }
+  }
+  @keyframes celebrate-pop {
+    0%   { transform: scale(0.4) rotate(-8deg); }
+    30%  { transform: scale(1.15) rotate(4deg); }
+    50%  { transform: scale(1) rotate(0deg); }
+    100% { transform: scale(1) rotate(0deg); }
+  }
+
   /* ---------- Bottom nav ---------- */
   .bottom-nav {
     display: flex;
@@ -552,6 +604,11 @@
 
   <div class="saved-toast" id="saved-toast">Na-save na ang schedule mo! ✓</div>
 
+  <div class="celebrate-overlay" id="celebrate-overlay">
+    <div class="celebrate-emoji" id="celebrate-emoji">🎉</div>
+    <div class="celebrate-text" id="celebrate-text">Na-punch na!</div>
+  </div>
+
   <div class="bottom-nav">
     <button class="nav-item active" data-screen="home">
       <div class="nav-icon">🏠</div>
@@ -691,6 +748,30 @@
     }, 2200);
   }
 
+  const CELEBRATE_EMOJIS = ["🎉", "✨", "🙌", "⭐", "🥳"];
+  const CELEBRATE_LINES = ["Na-punch na!", "Ayos yan!", "Good job!", "Solid!", "Naka-log na!"];
+
+  function celebratePunchConfirmed(punchName) {
+    const overlay = document.getElementById("celebrate-overlay");
+    const emojiEl = document.getElementById("celebrate-emoji");
+    const textEl = document.getElementById("celebrate-text");
+
+    const emoji = CELEBRATE_EMOJIS[Math.floor(Math.random() * CELEBRATE_EMOJIS.length)];
+    const line = CELEBRATE_LINES[Math.floor(Math.random() * CELEBRATE_LINES.length)];
+
+    emojiEl.textContent = emoji;
+    textEl.textContent = punchName ? (line + " — " + punchName) : line;
+
+    // Restart the animation even if it's already mid-run from a rapid second tap.
+    overlay.classList.remove("show");
+    void overlay.offsetWidth; // force reflow so the animation can retrigger
+    overlay.classList.add("show");
+
+    setTimeout(function () {
+      overlay.classList.remove("show");
+    }, 1300);
+  }
+
   // ---------- Notifications ----------
   const NOTIFIED_KEY = "dtrBuddy.notifiedToday";
   let swRegistration = null;
@@ -771,23 +852,37 @@
   }
 
   function fireReminder(punch) {
-    const title = "Paalala: " + punch.name;
+    const title = "Paalala: " + punch.name + " 🔔";
     const body = "Malapit na ang oras — " + to12Hour(punch.time) + ". Wag kalimutan mag-punch!";
+
+    // A longer, more noticeable buzz-pause-buzz pattern (milliseconds).
+    const vibrationPattern = [300, 150, 300, 150, 300];
 
     if (swRegistration && swRegistration.showNotification) {
       swRegistration.showNotification(title, {
         body: body,
-        icon: "icon.png",
         tag: punch.key,
-        vibrate: [200, 100, 200],
+        vibrate: vibrationPattern,
+        // renotify + silent:false ensures the system plays its default sound
+        // and vibrates again even if a notification with the same tag fired before.
+        renotify: true,
+        silent: false,
+        requireInteraction: true,
         actions: [
           { action: "confirm-" + punch.key, title: "Na-punch ko na ✓" }
         ],
         data: { punchKey: punch.key, punchName: punch.name }
       });
     } else if (Notification.permission === "granted") {
-      // Fallback without service worker: plain notification, no action button.
-      new Notification(title, { body: body, tag: punch.key });
+      // Fallback without service worker: plain notification, no action button,
+      // but still request vibration + default sound where the platform allows it.
+      new Notification(title, {
+        body: body,
+        tag: punch.key,
+        vibrate: vibrationPattern,
+        renotify: true,
+        silent: false
+      });
     }
   }
 
@@ -820,6 +915,7 @@
         const punch = punches.find(function (p) { return p.key === punchKey; });
         if (punch) {
           confirmPunch(punch.key, punch.name, punch.time);
+          celebratePunchConfirmed(punch.name);
         }
         showToast("Naka-log na — good job! ✓");
         renderHome();
@@ -1158,6 +1254,7 @@
         item.classList.add("tappable");
         item.addEventListener("click", function () {
           confirmPunch(p.key, p.name, p.time);
+          celebratePunchConfirmed(p.name);
           showToast(p.name + " naka-log na! ✓");
           renderHome();
         });
