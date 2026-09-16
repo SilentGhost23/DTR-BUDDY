@@ -1,0 +1,1203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DTR Buddy</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --cream: #FFF8F0;
+    --card: #F0EBE3;
+    --plum: #2B2640;
+    --coral: #FF6B6B;
+    --teal: #4ECDC4;
+    --mustard: #FFC857;
+    --muted: #8B8499;
+  }
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html, body {
+    height: 100%;
+    background: var(--cream);
+  }
+
+  body {
+    font-family: 'Inter', sans-serif;
+    display: flex;
+    justify-content: center;
+  }
+
+  #app {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    background: var(--cream);
+    display: flex;
+    flex-direction: column;
+  }
+
+  .screen {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 22px 100px;
+    display: none;
+  }
+  .screen.active { display: flex; flex-direction: column; }
+
+  /* ---------- Header ---------- */
+  .greeting {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 26px;
+    font-weight: 600;
+    color: var(--plum);
+    margin-bottom: 4px;
+  }
+  .greeting-sub {
+    font-size: 14px;
+    color: var(--muted);
+    margin-bottom: 22px;
+  }
+
+  /* ---------- Hero card ---------- */
+  .hero {
+    background: var(--plum);
+    border-radius: 28px;
+    padding: 26px 24px;
+    color: var(--cream);
+    position: relative;
+    overflow: hidden;
+    margin-bottom: 28px;
+  }
+  .hero::after {
+    content: "";
+    position: absolute;
+    width: 160px;
+    height: 160px;
+    background: var(--teal);
+    opacity: 0.25;
+    border-radius: 50%;
+    top: -70px;
+    right: -50px;
+  }
+  .hero-label {
+    font-size: 13px;
+    color: var(--mustard);
+    font-weight: 600;
+    margin-bottom: 6px;
+    position: relative;
+  }
+  .hero-title {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 14px;
+    position: relative;
+  }
+  .hero-time-row {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    position: relative;
+    flex-wrap: wrap;
+  }
+  .hero-time {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 40px;
+    font-weight: 600;
+  }
+  .hero-countdown {
+    font-size: 14px;
+    color: var(--teal);
+    font-weight: 500;
+  }
+
+  /* ---------- Sections ---------- */
+  .section-title {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 18px;
+    font-weight: 600;
+    color: var(--plum);
+    margin-bottom: 14px;
+  }
+
+  /* ---------- Timeline (Home) ---------- */
+  .timeline {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 20px;
+    background: white;
+    border-radius: 18px;
+    padding: 4px 18px;
+  }
+
+  .t-item {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(43,38,64,0.08);
+  }
+  .t-item:last-child { border-bottom: none; }
+
+  .t-dot {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+  }
+  .t-dot.done { background: var(--teal); color: white; }
+  .t-dot.pending { border: 2px solid #D9D2C6; background: transparent; }
+
+  .t-info { flex: 1; }
+  .t-name { font-size: 15px; font-weight: 600; color: var(--plum); }
+  .t-time { font-size: 13px; color: var(--muted); }
+
+  .t-status {
+    font-size: 12px;
+    font-weight: 600;
+    padding: 4px 10px;
+    border-radius: 20px;
+    white-space: nowrap;
+  }
+  .t-status.done { background: rgba(78,205,196,0.15); color: #2C9A92; }
+  .t-status.pending { background: rgba(255,200,87,0.2); color: #A87A00; }
+  .t-status.off { background: rgba(139,132,153,0.12); color: var(--muted); }
+
+  .t-item.tappable { cursor: pointer; }
+  .t-item.tappable:active { opacity: 0.7; }
+  .t-status.confirm-btn {
+    background: var(--coral);
+    color: white;
+    border: none;
+    font-family: 'Inter', sans-serif;
+  }
+  .t-status.confirm-btn-early {
+    background: rgba(78,205,196,0.18);
+    color: #2C9A92;
+    border: none;
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+  }
+
+  .override-banner {
+    background: rgba(255,200,87,0.25);
+    border-radius: 14px;
+    padding: 12px 16px;
+    font-size: 13px;
+    color: #7A5900;
+    font-weight: 600;
+    margin-bottom: 20px;
+  }
+
+  .notif-banner {
+    background: white;
+    border: 2px dashed var(--coral);
+    border-radius: 16px;
+    padding: 16px 18px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .notif-banner-text {
+    font-size: 13px;
+    color: var(--plum);
+    line-height: 1.5;
+  }
+  .notif-banner-text strong {
+    display: block;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 15px;
+    margin-bottom: 4px;
+  }
+  .notif-enable-btn {
+    background: var(--coral);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .notif-enable-btn:active { opacity: 0.85; }
+
+  .notif-banner.granted {
+    border: 2px solid var(--teal);
+  }
+  .notif-banner.granted .notif-banner-text { color: #2C9A92; }
+
+  /* ---------- Log screen ---------- */
+  .log-entry {
+    background: white;
+    border-radius: 18px;
+    padding: 16px 18px;
+    margin-bottom: 12px;
+  }
+  .log-date {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--plum);
+    margin-bottom: 10px;
+  }
+  .log-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 0;
+    font-size: 13px;
+  }
+  .log-row-label { color: var(--muted); }
+  .log-row-value { color: var(--plum); font-weight: 600; }
+  .log-row-value.late { color: var(--coral); }
+  .log-row-value.ontime { color: #2C9A92; }
+
+  .log-row-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .log-delete-btn {
+    background: none;
+    border: none;
+    color: var(--muted);
+    font-size: 13px;
+    cursor: pointer;
+    padding: 2px 4px;
+    line-height: 1;
+  }
+  .log-delete-btn:active { color: var(--coral); }
+
+  .streak-card {
+    background: var(--mustard);
+    border-radius: 20px;
+    padding: 18px 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+  }
+  .streak-text { font-size: 14px; color: var(--plum); font-weight: 600; }
+  .streak-num { font-family: 'Fredoka', sans-serif; font-size: 22px; color: var(--plum); font-weight: 700; }
+
+  .log-empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    margin-top: 40px;
+    line-height: 1.6;
+  }
+
+  /* ---------- Settings screen ---------- */
+  .set-title {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 22px;
+    font-weight: 600;
+    color: var(--plum);
+    margin-bottom: 4px;
+  }
+  .set-title-sub {
+    font-size: 13px;
+    color: var(--muted);
+    margin-bottom: 22px;
+  }
+
+  .set-group {
+    background: white;
+    border-radius: 18px;
+    padding: 6px 18px;
+    margin-bottom: 20px;
+  }
+  .set-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 0;
+    border-bottom: 1px solid rgba(43,38,64,0.06);
+    gap: 12px;
+  }
+  .set-row:last-child { border-bottom: none; }
+  .set-label { font-size: 15px; font-weight: 500; color: var(--plum); }
+  .set-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  .set-row input[type="time"] {
+    font-family: 'Inter', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--plum);
+    border: none;
+    background: var(--card);
+    border-radius: 10px;
+    padding: 8px 10px;
+  }
+
+  .toggle-btn {
+    width: 44px;
+    height: 26px;
+    border-radius: 20px;
+    position: relative;
+    flex-shrink: 0;
+    border: none;
+    cursor: pointer;
+    background: #E3DDD3;
+    transition: background 0.15s ease;
+  }
+  .toggle-btn.on { background: var(--teal); }
+  .toggle-btn::after {
+    content: "";
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    background: white;
+    border-radius: 50%;
+    top: 3px;
+    left: 3px;
+    transition: left 0.15s ease;
+  }
+  .toggle-btn.on::after { left: 21px; }
+
+  .save-btn {
+    width: 100%;
+    padding: 16px;
+    background: var(--coral);
+    color: white;
+    border: none;
+    border-radius: 16px;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    margin-bottom: 12px;
+  }
+  .save-btn:active { opacity: 0.85; }
+
+  .saved-toast {
+    position: fixed;
+    bottom: 100px;
+    left: 50%;
+    transform: translateX(-50%) translateY(20px);
+    background: var(--plum);
+    color: var(--cream);
+    padding: 12px 22px;
+    border-radius: 30px;
+    font-size: 14px;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: all 0.25s ease;
+    white-space: nowrap;
+    z-index: 50;
+  }
+  .saved-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* ---------- Bottom nav ---------- */
+  .bottom-nav {
+    display: flex;
+    background: white;
+    border-top: 1px solid rgba(43,38,64,0.08);
+    padding: 14px 0 20px;
+    position: fixed;
+    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100%;
+    max-width: 480px;
+  }
+  .nav-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-family: 'Inter', sans-serif;
+  }
+  .nav-item.active { color: var(--coral); }
+  .nav-icon { font-size: 20px; }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+  <!-- SCREEN: HOME -->
+  <div class="screen active" id="screen-home">
+    <div class="greeting">Kumusta, Orwene 👋</div>
+    <div class="greeting-sub" id="home-date">—</div>
+
+    <div id="home-override-banner"></div>
+    <div id="notif-permission-banner"></div>
+
+    <div class="hero">
+      <div class="hero-label" id="hero-label">Next punch</div>
+      <div class="hero-title" id="hero-title">—</div>
+      <div class="hero-time-row">
+        <div class="hero-time" id="hero-time">—</div>
+        <div class="hero-countdown" id="hero-countdown"></div>
+      </div>
+    </div>
+
+    <div id="streak-card-container"></div>
+
+    <div class="section-title">Today's schedule</div>
+    <div class="timeline" id="home-timeline"></div>
+  </div>
+
+  <!-- SCREEN: LOG -->
+  <div class="screen" id="screen-log">
+    <div class="greeting">Your log</div>
+    <div class="greeting-sub">Recent punches, saved on this device</div>
+    <div id="log-list">
+      <div class="log-empty">Wala pa tayong laman dito, pre.<br>Once na-save mo yung schedule mo, dito lalabas ang punch history.</div>
+    </div>
+  </div>
+
+  <!-- SCREEN: SETTINGS -->
+  <div class="screen" id="screen-settings">
+    <div class="set-title">Settings</div>
+    <div class="set-title-sub">Your schedule &amp; reminders</div>
+
+    <div class="section-title">Fixed schedule</div>
+    <div class="set-group">
+      <div class="set-row">
+        <div>
+          <div class="set-label">Time In (AM)</div>
+          <div class="set-sub">Morning punch in</div>
+        </div>
+        <input type="time" id="sched-time-in-am" value="08:00">
+      </div>
+      <div class="set-row">
+        <div>
+          <div class="set-label">Lunch Out</div>
+          <div class="set-sub">Break punch out</div>
+        </div>
+        <input type="time" id="sched-lunch-out" value="12:00">
+      </div>
+      <div class="set-row">
+        <div>
+          <div class="set-label">Lunch In</div>
+          <div class="set-sub">Break punch in</div>
+        </div>
+        <input type="time" id="sched-lunch-in" value="13:00">
+      </div>
+      <div class="set-row">
+        <div>
+          <div class="set-label">Time Out (PM)</div>
+          <div class="set-sub">End of shift punch out</div>
+        </div>
+        <input type="time" id="sched-time-out-pm" value="17:00">
+      </div>
+    </div>
+
+    <div class="section-title">Reminders</div>
+    <div class="set-group">
+      <div class="set-row">
+        <div>
+          <div class="set-label">Remind before</div>
+          <div class="set-sub">Heads-up ahead of each punch</div>
+        </div>
+        <select id="sched-remind-before" style="font-family:'Inter',sans-serif; font-size:14px; font-weight:600; color:var(--plum); border:none; background:var(--card); border-radius:10px; padding:8px 10px;">
+          <option value="0">Sa mismong oras</option>
+          <option value="5" selected>5 mins bago</option>
+          <option value="10">10 mins bago</option>
+          <option value="15">15 mins bago</option>
+        </select>
+      </div>
+      <div class="set-row">
+        <div>
+          <div class="set-label">Lunch reminders</div>
+          <div class="set-sub">Notify for break punches too</div>
+        </div>
+        <button class="toggle-btn on" id="toggle-lunch-reminders" data-key="lunchReminders"></button>
+      </div>
+    </div>
+
+    <div class="section-title">Today's override</div>
+    <div class="set-group">
+      <div class="set-row">
+        <div>
+          <div class="set-label">Different shift today?</div>
+          <div class="set-sub">Adjust just for today, resets tomorrow</div>
+        </div>
+        <button class="toggle-btn off" id="toggle-override" data-key="overrideToday"></button>
+      </div>
+      <div class="set-row" id="override-time-row" style="display:none;">
+        <div>
+          <div class="set-label">Today's Time In</div>
+          <div class="set-sub">Only applies today</div>
+        </div>
+        <input type="time" id="override-time-in" value="08:00">
+      </div>
+    </div>
+
+    <button class="save-btn" id="save-schedule-btn">I-save ang schedule</button>
+  </div>
+
+  <div class="saved-toast" id="saved-toast">Na-save na ang schedule mo! ✓</div>
+
+  <div class="bottom-nav">
+    <button class="nav-item active" data-screen="home">
+      <div class="nav-icon">🏠</div>
+      Home
+    </button>
+    <button class="nav-item" data-screen="log">
+      <div class="nav-icon">📋</div>
+      Log
+    </button>
+    <button class="nav-item" data-screen="settings">
+      <div class="nav-icon">⚙️</div>
+      Settings
+    </button>
+  </div>
+
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  const STORAGE_KEY = "dtrBuddy.schedule";
+
+  const DEFAULT_SCHEDULE = {
+    timeInAM: "08:00",
+    lunchOut: "12:00",
+    lunchIn: "13:00",
+    timeOutPM: "17:00",
+    remindBeforeMins: 5,
+    lunchReminders: true,
+    overrideToday: false,
+    overrideDate: null,      // date string this override applies to, so it auto-resets
+    overrideTimeInAM: "08:00"
+  };
+
+  // ---------- Storage helpers ----------
+  function loadSchedule() {
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return { ...DEFAULT_SCHEDULE };
+      const parsed = JSON.parse(raw);
+      return { ...DEFAULT_SCHEDULE, ...parsed };
+    } catch (err) {
+      console.error("Could not read saved schedule, using defaults.", err);
+      return { ...DEFAULT_SCHEDULE };
+    }
+  }
+
+  function saveSchedule(schedule) {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(schedule));
+      return true;
+    } catch (err) {
+      console.error("Could not save schedule.", err);
+      return false;
+    }
+  }
+
+  function todayStr() {
+    const d = new Date();
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  let schedule = loadSchedule();
+
+  // If an override was set for a previous day, it's expired — clear it.
+  if (schedule.overrideToday && schedule.overrideDate !== todayStr()) {
+    schedule.overrideToday = false;
+    saveSchedule(schedule);
+  }
+
+  // ---------- Settings screen: populate fields from saved schedule ----------
+  function populateSettingsForm() {
+    document.getElementById("sched-time-in-am").value = schedule.timeInAM;
+    document.getElementById("sched-lunch-out").value = schedule.lunchOut;
+    document.getElementById("sched-lunch-in").value = schedule.lunchIn;
+    document.getElementById("sched-time-out-pm").value = schedule.timeOutPM;
+    document.getElementById("sched-remind-before").value = String(schedule.remindBeforeMins);
+
+    setToggleState("toggle-lunch-reminders", schedule.lunchReminders);
+    setToggleState("toggle-override", schedule.overrideToday);
+
+    document.getElementById("override-time-in").value = schedule.overrideTimeInAM;
+    document.getElementById("override-time-row").style.display = schedule.overrideToday ? "flex" : "none";
+  }
+
+  function setToggleState(id, isOn) {
+    const btn = document.getElementById(id);
+    if (isOn) {
+      btn.classList.add("on");
+    } else {
+      btn.classList.remove("on");
+    }
+  }
+
+  function getToggleState(id) {
+    return document.getElementById(id).classList.contains("on");
+  }
+
+  // Toggle buttons flip on click
+  document.querySelectorAll(".toggle-btn").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      btn.classList.toggle("on");
+      if (btn.id === "toggle-override") {
+        const overrideRow = document.getElementById("override-time-row");
+        overrideRow.style.display = btn.classList.contains("on") ? "flex" : "none";
+      }
+    });
+  });
+
+  // Save button: read form, validate, persist, refresh Home
+  document.getElementById("save-schedule-btn").addEventListener("click", function () {
+    const updated = {
+      timeInAM: document.getElementById("sched-time-in-am").value || DEFAULT_SCHEDULE.timeInAM,
+      lunchOut: document.getElementById("sched-lunch-out").value || DEFAULT_SCHEDULE.lunchOut,
+      lunchIn: document.getElementById("sched-lunch-in").value || DEFAULT_SCHEDULE.lunchIn,
+      timeOutPM: document.getElementById("sched-time-out-pm").value || DEFAULT_SCHEDULE.timeOutPM,
+      remindBeforeMins: parseInt(document.getElementById("sched-remind-before").value, 10),
+      lunchReminders: getToggleState("toggle-lunch-reminders"),
+      overrideToday: getToggleState("toggle-override"),
+      overrideDate: getToggleState("toggle-override") ? todayStr() : null,
+      overrideTimeInAM: document.getElementById("override-time-in").value || DEFAULT_SCHEDULE.overrideTimeInAM
+    };
+
+    schedule = updated;
+    const ok = saveSchedule(schedule);
+    showToast(ok ? "Na-save na ang schedule mo! ✓" : "May problema sa pag-save, subukan ulit.");
+    renderHome();
+  });
+
+  function showToast(message) {
+    const toast = document.getElementById("saved-toast");
+    toast.textContent = message;
+    toast.classList.add("show");
+    setTimeout(function () {
+      toast.classList.remove("show");
+    }, 2200);
+  }
+
+  // ---------- Notifications ----------
+  const NOTIFIED_KEY = "dtrBuddy.notifiedToday";
+  let swRegistration = null;
+
+  function loadNotifiedLog() {
+    try {
+      const raw = localStorage.getItem(NOTIFIED_KEY);
+      if (!raw) return {};
+      const parsed = JSON.parse(raw);
+      // Wipe entries from a previous day so reminders fire fresh each day
+      if (parsed.date !== todayStr()) return {};
+      return parsed;
+    } catch (err) {
+      return {};
+    }
+  }
+
+  function markNotified(punchKey) {
+    const log = loadNotifiedLog();
+    log.date = todayStr();
+    log[punchKey] = true;
+    localStorage.setItem(NOTIFIED_KEY, JSON.stringify(log));
+  }
+
+  function wasAlreadyNotified(punchKey) {
+    const log = loadNotifiedLog();
+    return !!log[punchKey];
+  }
+
+  function renderNotifBanner() {
+    const el = document.getElementById("notif-permission-banner");
+    if (!("Notification" in window)) {
+      el.innerHTML = '<div class="notif-banner"><div class="notif-banner-text"><strong>Hindi supported dito</strong>Subukan mo sa Chrome sa Android para gumana ang mga paalala.</div></div>';
+      return;
+    }
+
+    if (Notification.permission === "granted") {
+      el.innerHTML = '<div class="notif-banner granted"><div class="notif-banner-text"><strong>Naka-on na ang mga paalala ✓</strong>Papaalalahanan ka namin bago dumating ang oras ng bawat punch.</div></div>';
+      return;
+    }
+
+    if (Notification.permission === "denied") {
+      el.innerHTML = '<div class="notif-banner"><div class="notif-banner-text"><strong>Naka-block ang notifications</strong>Buksan ang browser settings mo at payagan ang notifications para dito.</div></div>';
+      return;
+    }
+
+    // default / not yet asked
+    el.innerHTML = '<div class="notif-banner"><div class="notif-banner-text"><strong>Gusto mo bang paalalahanan?</strong>I-enable ang notifications para di ka na makakalimot mag-punch.</div></div><button class="notif-enable-btn" id="enable-notif-btn">I-enable ang paalala</button>';
+
+    const btn = document.getElementById("enable-notif-btn");
+    if (btn) {
+      btn.addEventListener("click", async function () {
+        try {
+          const result = await Notification.requestPermission();
+          renderNotifBanner();
+          if (result === "granted") {
+            showToast("Ayos! Naka-on na ang mga paalala. ✓");
+          }
+        } catch (err) {
+          console.error("Notification permission request failed.", err);
+        }
+      });
+    }
+  }
+
+  async function setupServiceWorker() {
+    if (!("serviceWorker" in navigator)) {
+      console.warn("Service workers not supported in this browser.");
+      return;
+    }
+    try {
+      swRegistration = await navigator.serviceWorker.register("sw.js");
+    } catch (err) {
+      // Common cause: page opened directly as a file:// path instead of being hosted.
+      // Notifications still work without the service worker, just without the action button.
+      console.warn("Service worker registration failed (expected if running from a local file, not hosted).", err);
+    }
+  }
+
+  function fireReminder(punch) {
+    const title = "Paalala: " + punch.name;
+    const body = "Malapit na ang oras — " + to12Hour(punch.time) + ". Wag kalimutan mag-punch!";
+
+    if (swRegistration && swRegistration.showNotification) {
+      swRegistration.showNotification(title, {
+        body: body,
+        icon: "icon.png",
+        tag: punch.key,
+        vibrate: [200, 100, 200],
+        actions: [
+          { action: "confirm-" + punch.key, title: "Na-punch ko na ✓" }
+        ],
+        data: { punchKey: punch.key, punchName: punch.name }
+      });
+    } else if (Notification.permission === "granted") {
+      // Fallback without service worker: plain notification, no action button.
+      new Notification(title, { body: body, tag: punch.key });
+    }
+  }
+
+  function checkAndFireReminders() {
+    if (!("Notification" in window) || Notification.permission !== "granted") return;
+
+    const now = new Date();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const punches = getTodaysPunches();
+
+    punches.forEach(function (p) {
+      const [h, m] = p.time.split(":").map(Number);
+      const punchMinutes = h * 60 + m;
+      const remindAt = punchMinutes - schedule.remindBeforeMins;
+
+      // Fire once we've reached the remind time and haven't already fired today for this punch.
+      if (nowMinutes >= remindAt && nowMinutes <= punchMinutes + 1 && !wasAlreadyNotified(p.key)) {
+        fireReminder(p);
+        markNotified(p.key);
+      }
+    });
+  }
+
+  // Listen for "Na-punch ko na" confirmations coming back from the service worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.addEventListener("message", function (event) {
+      if (event.data && event.data.type === "punch-confirmed") {
+        const punchKey = event.data.punchKey;
+        const punches = getTodaysPunches();
+        const punch = punches.find(function (p) { return p.key === punchKey; });
+        if (punch) {
+          confirmPunch(punch.key, punch.name, punch.time);
+        }
+        showToast("Naka-log na — good job! ✓");
+        renderHome();
+      }
+    });
+  }
+
+  // ---------- Punch log (actual confirmed punches) ----------
+  const PUNCH_LOG_KEY = "dtrBuddy.punchLog";
+
+  function loadPunchLog() {
+    try {
+      const raw = localStorage.getItem(PUNCH_LOG_KEY);
+      if (!raw) return [];
+      return JSON.parse(raw);
+    } catch (err) {
+      console.error("Could not read punch log.", err);
+      return [];
+    }
+  }
+
+  function savePunchLog(entries) {
+    try {
+      localStorage.setItem(PUNCH_LOG_KEY, JSON.stringify(entries));
+      return true;
+    } catch (err) {
+      console.error("Could not save punch log.", err);
+      return false;
+    }
+  }
+
+  // Records that a punch was confirmed right now, comparing against its scheduled time.
+  function confirmPunch(punchKey, punchName, scheduledTime) {
+    const log = loadPunchLog();
+    const date = todayStr();
+
+    // Avoid duplicate entries if the same punch gets confirmed twice today
+    // (e.g. tapped on Home, then also tapped the notification button).
+    const alreadyLogged = log.some(function (e) { return e.date === date && e.punchKey === punchKey; });
+    if (alreadyLogged) return;
+
+    const now = new Date();
+    const confirmedAtMinutes = now.getHours() * 60 + now.getMinutes();
+    const [sh, sm] = scheduledTime.split(":").map(Number);
+    const scheduledMinutes = sh * 60 + sm;
+    const isLate = confirmedAtMinutes > scheduledMinutes;
+
+    log.push({
+      date: date,
+      punchKey: punchKey,
+      punchName: punchName,
+      scheduledTime: scheduledTime,
+      confirmedTime: String(now.getHours()).padStart(2, "0") + ":" + String(now.getMinutes()).padStart(2, "0"),
+      isLate: isLate
+    });
+
+    savePunchLog(log);
+  }
+
+  function isPunchConfirmedToday(punchKey) {
+    const log = loadPunchLog();
+    const date = todayStr();
+    return log.some(function (e) { return e.date === date && e.punchKey === punchKey; });
+  }
+
+  function deletePunchEntry(date, punchKey) {
+    const log = loadPunchLog();
+    const filtered = log.filter(function (e) { return !(e.date === date && e.punchKey === punchKey); });
+    savePunchLog(filtered);
+  }
+
+  // Counts consecutive days (most recent backward) where every punch for that
+  // day was logged and none were late. An in-progress today doesn't break the
+  // streak, it's just not counted until it's fully (and on-time) confirmed.
+  function calculateStreak() {
+    const log = loadPunchLog();
+    if (log.length === 0) return 0;
+
+    const byDate = {};
+    log.forEach(function (e) {
+      if (!byDate[e.date]) byDate[e.date] = [];
+      byDate[e.date].push(e);
+    });
+
+    const expectedPunchCount = getTodaysPunches().length;
+    const today = todayStr();
+
+    let streak = 0;
+    let cursor = new Date();
+
+    while (true) {
+      const dateStr = cursor.getFullYear() + "-" + String(cursor.getMonth() + 1).padStart(2, "0") + "-" + String(cursor.getDate()).padStart(2, "0");
+      const dayEntries = byDate[dateStr];
+      const isComplete = dayEntries && dayEntries.length >= expectedPunchCount && dayEntries.every(function (e) { return !e.isLate; });
+
+      if (dateStr === today) {
+        if (isComplete) streak++;
+        // If today isn't complete yet, that's fine — move on to check yesterday
+        // without breaking the streak.
+      } else {
+        if (isComplete) {
+          streak++;
+        } else {
+          break;
+        }
+      }
+
+      cursor.setDate(cursor.getDate() - 1);
+      if (streak > 365) break;
+    }
+
+    return streak;
+  }
+
+  function renderStreakCard() {
+    const container = document.getElementById("streak-card-container");
+    const streak = calculateStreak();
+
+    if (streak === 0) {
+      container.innerHTML = "";
+      return;
+    }
+
+    container.innerHTML =
+      '<div class="streak-card">' +
+        '<div class="streak-text">On-time streak 🔥</div>' +
+        '<div class="streak-num">' + streak + (streak === 1 ? " day" : " days") + '</div>' +
+      '</div>';
+  }
+
+  // ---------- Log screen rendering ----------
+  function formatLogDate(dateStr) {
+    // dateStr is "YYYY-MM-DD"
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+    const today = todayStr();
+
+    if (dateStr === today) return "Today — " + date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    return date.toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
+  }
+
+  function renderLog() {
+    const logListEl = document.getElementById("log-list");
+    const entries = loadPunchLog();
+
+    if (entries.length === 0) {
+      logListEl.innerHTML = '<div class="log-empty">Wala ka pang na-cconfirm na punch.<br>Pag na-tap mo yung reminder o yung schedule sa Home, dito lalabas ang history mo.</div>';
+      return;
+    }
+
+    // Group entries by date, most recent date first
+    const byDate = {};
+    entries.forEach(function (e) {
+      if (!byDate[e.date]) byDate[e.date] = [];
+      byDate[e.date].push(e);
+    });
+
+    const sortedDates = Object.keys(byDate).sort().reverse();
+
+    logListEl.innerHTML = "";
+    sortedDates.forEach(function (date) {
+      const dayEntries = byDate[date];
+      const card = document.createElement("div");
+      card.className = "log-entry";
+
+      let rowsHtml = "";
+      dayEntries.forEach(function (e) {
+        const valueClass = e.isLate ? "late" : "ontime";
+        const marker = e.isLate ? "⚠" : "✓";
+        rowsHtml +=
+          '<div class="log-row" data-date="' + date + '" data-key="' + e.punchKey + '">' +
+            '<span class="log-row-label">' + e.punchName + '</span>' +
+            '<span class="log-row-actions">' +
+              '<span class="log-row-value ' + valueClass + '">' + to12Hour(e.confirmedTime) + ' ' + marker + '</span>' +
+              '<button class="log-delete-btn" data-date="' + date + '" data-key="' + e.punchKey + '" title="Alisin">✕</button>' +
+            '</span>' +
+          '</div>';
+      });
+
+      card.innerHTML = '<div class="log-date">' + formatLogDate(date) + '</div>' + rowsHtml;
+      logListEl.appendChild(card);
+    });
+
+    // Delete a single entry
+    logListEl.querySelectorAll(".log-delete-btn").forEach(function (btn) {
+      btn.addEventListener("click", function (event) {
+        event.stopPropagation();
+        const date = btn.getAttribute("data-date");
+        const key = btn.getAttribute("data-key");
+        deletePunchEntry(date, key);
+        showToast("Naalis na sa log.");
+        renderLog();
+        renderHome();
+      });
+    });
+  }
+
+  // ---------- Home screen rendering ----------
+  function to12Hour(hhmm) {
+    const [h, m] = hhmm.split(":").map(Number);
+    const period = h >= 12 ? "PM" : "AM";
+    let hour12 = h % 12;
+    if (hour12 === 0) hour12 = 12;
+    return hour12 + ":" + String(m).padStart(2, "0") + " " + period;
+  }
+
+  function getTodaysPunches() {
+    const effectiveTimeInAM = (schedule.overrideToday && schedule.overrideDate === todayStr())
+      ? schedule.overrideTimeInAM
+      : schedule.timeInAM;
+
+    const punches = [
+      { key: "timeInAM", name: "Time In (AM)", time: effectiveTimeInAM }
+    ];
+    if (schedule.lunchReminders) {
+      punches.push({ key: "lunchOut", name: "Lunch Out", time: schedule.lunchOut });
+      punches.push({ key: "lunchIn", name: "Lunch In", time: schedule.lunchIn });
+    }
+    punches.push({ key: "timeOutPM", name: "Time Out (PM)", time: schedule.timeOutPM });
+    return punches;
+  }
+
+  function formatCountdown(totalSeconds) {
+    if (totalSeconds <= 0) return "ngayon na";
+    const h = Math.floor(totalSeconds / 3600);
+    const m = Math.floor((totalSeconds % 3600) / 60);
+    const s = totalSeconds % 60;
+
+    if (h > 0) {
+      return "in " + h + "h " + String(m).padStart(2, "0") + "m";
+    }
+    if (m > 0) {
+      return "in " + m + "m " + String(s).padStart(2, "0") + "s";
+    }
+    return "in " + s + "s";
+  }
+
+  function findNextPunch(now) {
+    const punches = getTodaysPunches();
+    const nowSeconds = now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+
+    for (const p of punches) {
+      const [h, m] = p.time.split(":").map(Number);
+      const punchSeconds = h * 3600 + m * 60;
+      if (punchSeconds >= nowSeconds) {
+        return { ...p, secondsFromNow: punchSeconds - nowSeconds };
+      }
+    }
+    return null;
+  }
+
+  // Updates just the hero countdown text — cheap enough to run every second.
+  function tickCountdown() {
+    // Don't bother updating the DOM if the Home screen isn't even visible.
+    const homeScreen = document.getElementById("screen-home");
+    if (!homeScreen.classList.contains("active")) return;
+
+    const now = new Date();
+    const next = findNextPunch(now);
+
+    if (next) {
+      document.getElementById("hero-label").textContent = "Next punch";
+      document.getElementById("hero-title").textContent = next.name;
+      document.getElementById("hero-time").textContent = to12Hour(next.time);
+      document.getElementById("hero-countdown").textContent = formatCountdown(next.secondsFromNow);
+    } else {
+      document.getElementById("hero-label").textContent = "Tapos na";
+      document.getElementById("hero-title").textContent = "Wala nang punch ngayon";
+      document.getElementById("hero-time").textContent = "🎉";
+      document.getElementById("hero-countdown").textContent = "Kita tayo bukas, pre!";
+    }
+  }
+
+  function renderHome() {
+    const now = new Date();
+    document.getElementById("home-date").textContent = now.toLocaleDateString("en-US", {
+      weekday: "long", month: "long", day: "numeric"
+    });
+
+    const bannerEl = document.getElementById("home-override-banner");
+    if (schedule.overrideToday && schedule.overrideDate === todayStr()) {
+      bannerEl.innerHTML = '<div class="override-banner">May adjusted na oras ka ngayong araw para sa Time In (AM). Check mo sa Settings.</div>';
+    } else {
+      bannerEl.innerHTML = "";
+    }
+
+    const punches = getTodaysPunches();
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+
+    // Hero countdown (also refreshed every second by tickCountdown, but set it
+    // immediately here too so there's no blank flash right after navigating).
+    tickCountdown();
+    renderStreakCard();
+
+    // Timeline list
+    const timelineEl = document.getElementById("home-timeline");
+    timelineEl.innerHTML = "";
+    punches.forEach(function (p) {
+      const [h, m] = p.time.split(":").map(Number);
+      const punchMinutes = h * 60 + m;
+      const isPast = punchMinutes < nowMinutes;
+      const isConfirmed = isPunchConfirmedToday(p.key);
+
+      const item = document.createElement("div");
+      let dotClass, statusClass, statusText, dotContent;
+
+      if (isConfirmed) {
+        dotClass = "done";
+        statusClass = "done";
+        statusText = "Na-punch na";
+        dotContent = "✓";
+      } else if (isPast) {
+        // Scheduled time has passed and still not confirmed — more urgent nudge.
+        dotClass = "pending";
+        statusClass = "confirm-btn";
+        statusText = "I-confirm";
+        dotContent = "";
+      } else {
+        // Still upcoming, but the user can confirm early (e.g. punched in ahead of schedule).
+        dotClass = "pending";
+        statusClass = "confirm-btn-early";
+        statusText = "I-confirm na";
+        dotContent = "";
+      }
+
+      item.className += " t-item";
+      item.innerHTML =
+        '<div class="t-dot ' + dotClass + '">' + dotContent + '</div>' +
+        '<div class="t-info">' +
+          '<div class="t-name">' + p.name + '</div>' +
+          '<div class="t-time">' + to12Hour(p.time) + '</div>' +
+        '</div>' +
+        '<div class="t-status ' + statusClass + '">' + statusText + '</div>';
+
+      if (!isConfirmed) {
+        item.classList.add("tappable");
+        item.addEventListener("click", function () {
+          confirmPunch(p.key, p.name, p.time);
+          showToast(p.name + " naka-log na! ✓");
+          renderHome();
+        });
+      }
+
+      timelineEl.appendChild(item);
+    });
+  }
+
+  // ---------- Nav ----------
+  document.querySelectorAll(".nav-item").forEach(function (btn) {
+    btn.addEventListener("click", function () {
+      const target = btn.getAttribute("data-screen");
+      document.querySelectorAll(".screen").forEach(function (s) { s.classList.remove("active"); });
+      document.querySelectorAll(".nav-item").forEach(function (n) { n.classList.remove("active"); });
+      document.getElementById("screen-" + target).classList.add("active");
+      btn.classList.add("active");
+      if (target === "home") renderHome();
+      if (target === "log") renderLog();
+    });
+  });
+
+  // ---------- Init ----------
+  populateSettingsForm();
+  renderHome();
+  renderNotifBanner();
+  setupServiceWorker();
+
+  // Tick the hero countdown every second for a live "in Xm Xs" feel.
+  setInterval(tickCountdown, 1000);
+
+  // Refresh the full timeline (done/pending states) once a minute — no need to
+  // rebuild the DOM every second for that part.
+  setInterval(renderHome, 60000);
+
+  // Check every 20 seconds whether it's time to fire a reminder.
+  setInterval(checkAndFireReminders, 20000);
+  checkAndFireReminders();
+})();
+</script>
+
+</body>
+</html>
