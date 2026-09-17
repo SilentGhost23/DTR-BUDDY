@@ -289,6 +289,79 @@
   .streak-text { font-size: 14px; color: var(--plum); font-weight: 600; }
   .streak-num { font-family: 'Fredoka', sans-serif; font-size: 22px; color: var(--plum); font-weight: 700; }
 
+  /* ---------- Summary tabs + stat cards (Log screen) ---------- */
+  .summary-tabs {
+    display: flex;
+    background: var(--card);
+    border-radius: 16px;
+    padding: 4px;
+    margin-bottom: 18px;
+    gap: 4px;
+  }
+  .summary-tab {
+    flex: 1;
+    border: none;
+    background: transparent;
+    padding: 10px 0;
+    border-radius: 12px;
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .summary-tab.active {
+    background: white;
+    color: var(--plum);
+    box-shadow: 0 2px 8px rgba(43,38,64,0.08);
+  }
+
+  .stat-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .stat-card {
+    border-radius: 18px;
+    padding: 18px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    text-align: center;
+  }
+  .stat-card.attendance { background: rgba(78,205,196,0.15); }
+  .stat-card.present { background: rgba(78,205,196,0.15); }
+  .stat-card.late { background: rgba(255,200,87,0.22); }
+  .stat-card.absent { background: rgba(255,107,107,0.15); }
+
+  .stat-icon { font-size: 20px; }
+  .stat-num {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 26px;
+    font-weight: 700;
+    color: var(--plum);
+  }
+  .stat-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+  .stat-card.attendance .stat-num,
+  .stat-card.present .stat-num { color: #2C9A92; }
+  .stat-card.late .stat-num { color: #A87A00; }
+  .stat-card.absent .stat-num { color: var(--coral); }
+
+  .summary-range-label {
+    font-size: 12px;
+    color: var(--muted);
+    margin-bottom: 14px;
+    margin-top: -8px;
+  }
+
   .log-empty {
     text-align: center;
     color: var(--muted);
@@ -379,6 +452,32 @@
     margin-bottom: 12px;
   }
   .save-btn:active { opacity: 0.85; }
+
+  .sync-mini-btn {
+    background: var(--plum);
+    color: var(--cream);
+    border: none;
+    border-radius: 10px;
+    padding: 8px 14px;
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+  }
+  .sync-mini-btn:active { opacity: 0.85; }
+  .sync-mini-btn:disabled { opacity: 0.5; cursor: default; }
+
+  #device-code-display {
+    font-family: 'Fredoka', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--teal);
+  }
+
+  #sync-status-text.syncing { color: var(--mustard); font-weight: 600; }
+  #sync-status-text.synced { color: #2C9A92; font-weight: 600; }
+  #sync-status-text.error { color: var(--coral); font-weight: 600; }
 
   .saved-toast {
     position: fixed;
@@ -484,6 +583,7 @@
   .nav-item.active { color: var(--coral); }
   .nav-icon { font-size: 20px; }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
 
@@ -516,6 +616,16 @@
   <div class="screen" id="screen-log">
     <div class="greeting">Your log</div>
     <div class="greeting-sub">Recent punches, saved on this device</div>
+
+    <div class="summary-tabs" id="summary-tabs">
+      <button class="summary-tab active" data-range="week">Weekly</button>
+      <button class="summary-tab" data-range="month">Monthly</button>
+      <button class="summary-tab" data-range="year">Yearly</button>
+    </div>
+
+    <div id="summary-card-container"></div>
+
+    <div class="section-title">History</div>
     <div id="log-list">
       <div class="log-empty">Wala pa tayong laman dito, pre.<br>Once na-save mo yung schedule mo, dito lalabas ang punch history.</div>
     </div>
@@ -599,6 +709,30 @@
       </div>
     </div>
 
+    <div class="section-title">Cross-device sync</div>
+    <div class="set-group">
+      <div class="set-row">
+        <div>
+          <div class="set-label">Your device code</div>
+          <div class="set-sub" id="device-code-display">—</div>
+        </div>
+        <button class="sync-mini-btn" id="copy-code-btn">Kopyahin</button>
+      </div>
+      <div class="set-row">
+        <div>
+          <div class="set-label">May code ka na mula sa ibang device?</div>
+          <div class="set-sub">I-type dito para ma-link</div>
+        </div>
+      </div>
+      <div class="set-row" style="gap: 8px;">
+        <input type="text" id="link-code-input" placeholder="hal. cozy-otter-42" style="flex: 1; font-family: 'Inter', sans-serif; font-size: 13px; border: none; background: var(--card); border-radius: 10px; padding: 10px 12px;">
+        <button class="sync-mini-btn" id="link-code-btn">I-link</button>
+      </div>
+      <div class="set-row" id="sync-status-row">
+        <div class="set-sub" id="sync-status-text">Hindi pa naka-sync sa cloud.</div>
+      </div>
+    </div>
+
     <button class="save-btn" id="save-schedule-btn">I-save ang schedule</button>
   </div>
 
@@ -629,6 +763,171 @@
 <script>
 (function () {
   "use strict";
+
+  // ---------- Cloud sync (Supabase) ----------
+  const SUPABASE_URL = "https://ibllnuusiwgkijcgqire.supabase.co";
+  const SUPABASE_ANON_KEY = "sb_publishable_q-hwwXBsPpXr4jlUYCsJYg_pa8rxM4r";
+  const DEVICE_CODE_KEY = "dtrBuddy.deviceCode";
+
+  let supabaseClient = null;
+  try {
+    if (window.supabase && window.supabase.createClient) {
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }
+  } catch (err) {
+    console.warn("Supabase client failed to initialize — sync will be unavailable.", err);
+  }
+
+  const CODE_WORDS_A = ["cozy", "brave", "sunny", "quiet", "swift", "gentle", "lucky", "happy", "calm", "bright"];
+  const CODE_WORDS_B = ["otter", "falcon", "maple", "river", "comet", "harbor", "pebble", "willow", "ember", "meadow"];
+
+  function generateDeviceCode() {
+    const a = CODE_WORDS_A[Math.floor(Math.random() * CODE_WORDS_A.length)];
+    const b = CODE_WORDS_B[Math.floor(Math.random() * CODE_WORDS_B.length)];
+    const n = Math.floor(Math.random() * 90) + 10; // 10–99
+    return a + "-" + b + "-" + n;
+  }
+
+  function getDeviceCode() {
+    let code = localStorage.getItem(DEVICE_CODE_KEY);
+    if (!code) {
+      code = generateDeviceCode();
+      localStorage.setItem(DEVICE_CODE_KEY, code);
+    }
+    return code;
+  }
+
+  function setDeviceCode(code) {
+    localStorage.setItem(DEVICE_CODE_KEY, code);
+  }
+
+  function setSyncStatus(state, message) {
+    const el = document.getElementById("sync-status-text");
+    if (!el) return;
+    el.classList.remove("syncing", "synced", "error");
+    if (state) el.classList.add(state);
+    el.textContent = message;
+  }
+
+  // Pushes the current schedule + punch log up to Supabase under this device's code.
+  async function pushToCloud() {
+    if (!supabaseClient) {
+      setSyncStatus("error", "Sync unavailable sa browser na ito.");
+      return;
+    }
+    const code = getDeviceCode();
+    setSyncStatus("syncing", "Nagsa-sync...");
+
+    try {
+      const { error } = await supabaseClient
+        .from("dtr_buddy_data")
+        .upsert({
+          device_code: code,
+          schedule: loadSchedule(),
+          punch_log: loadPunchLog()
+        }, { onConflict: "device_code" });
+
+      if (error) throw error;
+      setSyncStatus("synced", "Na-sync sa cloud ✓");
+    } catch (err) {
+      console.error("Cloud sync (push) failed.", err);
+      setSyncStatus("error", "Hindi na-sync — check ang internet mo.");
+    }
+  }
+
+  // Pulls schedule + punch log from Supabase for the given code, replacing local data.
+  async function pullFromCloud(code) {
+    if (!supabaseClient) {
+      setSyncStatus("error", "Sync unavailable sa browser na ito.");
+      return false;
+    }
+    setSyncStatus("syncing", "Kinukuha ang data...");
+
+    try {
+      const { data, error } = await supabaseClient
+        .from("dtr_buddy_data")
+        .select("schedule, punch_log")
+        .eq("device_code", code)
+        .maybeSingle();
+
+      if (error) throw error;
+
+      if (!data) {
+        setSyncStatus("error", "Walang nahanap na data sa code na iyan.");
+        return false;
+      }
+
+      if (data.schedule && Object.keys(data.schedule).length > 0) {
+        saveSchedule({ ...DEFAULT_SCHEDULE, ...data.schedule });
+      }
+      if (data.punch_log) {
+        savePunchLog(data.punch_log);
+      }
+
+      setSyncStatus("synced", "Na-link at na-sync ✓");
+      return true;
+    } catch (err) {
+      console.error("Cloud sync (pull) failed.", err);
+      setSyncStatus("error", "Hindi ma-link — check ang code at internet.");
+      return false;
+    }
+  }
+
+  // Subscribes to live changes on this device code's row so other devices'
+  // pushes are reflected here automatically, without a manual refresh.
+  let realtimeChannel = null;
+  function subscribeToRealtimeSync() {
+    if (!supabaseClient) return;
+    const code = getDeviceCode();
+
+    // Clean up any previous subscription (e.g. if the device code just changed
+    // via linking) before starting a new one.
+    if (realtimeChannel) {
+      supabaseClient.removeChannel(realtimeChannel);
+      realtimeChannel = null;
+    }
+
+    realtimeChannel = supabaseClient
+      .channel("dtr-buddy-" + code)
+      .on(
+        "postgres_changes",
+        {
+          event: "*",
+          schema: "public",
+          table: "dtr_buddy_data",
+          filter: "device_code=eq." + code
+        },
+        function (payload) {
+          const incoming = payload.new;
+          if (!incoming) return;
+
+          // Apply the incoming state directly — it's the same shape we push,
+          // so re-applying our own pushes back to ourselves is harmless.
+          if (incoming.schedule && Object.keys(incoming.schedule).length > 0) {
+            saveSchedule({ ...DEFAULT_SCHEDULE, ...incoming.schedule });
+          }
+          if (incoming.punch_log) {
+            savePunchLog(incoming.punch_log);
+          }
+
+          schedule = loadSchedule();
+          populateSettingsForm();
+          renderHome();
+          renderSummaryCard();
+          renderLog();
+          setSyncStatus("synced", "Na-update galing sa ibang device ✓");
+        }
+      )
+      .subscribe();
+  }
+
+  // Debounced auto-push so rapid actions (several confirms in a row) don't
+  // fire a network request each time.
+  let pushDebounceTimer = null;
+  function scheduleCloudPush() {
+    if (pushDebounceTimer) clearTimeout(pushDebounceTimer);
+    pushDebounceTimer = setTimeout(pushToCloud, 1500);
+  }
 
   const STORAGE_KEY = "dtrBuddy.schedule";
 
@@ -737,6 +1036,7 @@
     const ok = saveSchedule(schedule);
     showToast(ok ? "Na-save na ang schedule mo! ✓" : "May problema sa pag-save, subukan ulit.");
     renderHome();
+    scheduleCloudPush();
   });
 
   function showToast(message) {
@@ -916,6 +1216,7 @@
         if (punch) {
           confirmPunch(punch.key, punch.name, punch.time);
           celebratePunchConfirmed(punch.name);
+          scheduleCloudPush();
         }
         showToast("Naka-log na — good job! ✓");
         renderHome();
@@ -1047,6 +1348,161 @@
   }
 
   // ---------- Log screen rendering ----------
+  let activeSummaryRange = "week";
+
+  function getRangeStartDate(range, now) {
+    const start = new Date(now);
+    start.setHours(0, 0, 0, 0);
+
+    if (range === "week") {
+      // Monday as start of week
+      const day = start.getDay(); // 0 = Sunday
+      const diffToMonday = (day === 0) ? 6 : day - 1;
+      start.setDate(start.getDate() - diffToMonday);
+    } else if (range === "month") {
+      start.setDate(1);
+    } else if (range === "year") {
+      start.setMonth(0, 1);
+    }
+    return start;
+  }
+
+  function formatRangeLabel(range, now) {
+    const start = getRangeStartDate(range, now);
+    if (range === "week") {
+      const end = new Date(start);
+      end.setDate(end.getDate() + 6);
+      return start.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+    if (range === "month") {
+      return now.toLocaleDateString("en-US", { month: "long", year: "numeric" });
+    }
+    return String(now.getFullYear());
+  }
+
+  // Builds Present / Late / Absent / Attendance% stats for the given range,
+  // counting only calendar days up to and including today (can't judge future days).
+  function calculateSummaryStats(range) {
+    const now = new Date();
+    const start = getRangeStartDate(range, now);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+
+    const log = loadPunchLog();
+    const byDate = {};
+    log.forEach(function (e) {
+      if (!byDate[e.date]) byDate[e.date] = [];
+      byDate[e.date].push(e);
+    });
+
+    // Don't count any day before the user's very first logged punch — the
+    // app (and the user's tracking) didn't exist yet, so it's not a fair "absent".
+    const loggedDates = Object.keys(byDate).sort();
+    const firstTrackedDate = loggedDates.length > 0 ? new Date(loggedDates[0] + "T00:00:00") : null;
+
+    let effectiveStart = start;
+    if (firstTrackedDate && firstTrackedDate > effectiveStart) {
+      effectiveStart = firstTrackedDate;
+    }
+
+    // If there's no tracking history at all yet, there's nothing to summarize.
+    if (!firstTrackedDate) {
+      return { attendancePct: 0, present: 0, late: 0, absent: 0 };
+    }
+
+    // Today only counts as "elapsed" once the last scheduled punch of the day
+    // has actually passed — otherwise it's still in progress, not absent.
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const todaysPunches = getTodaysPunches();
+    const lastPunchMinutes = todaysPunches.reduce(function (max, p) {
+      const [h, m] = p.time.split(":").map(Number);
+      return Math.max(max, h * 60 + m);
+    }, 0);
+    const todayIsOver = nowMinutes > lastPunchMinutes;
+
+    let presentDays = 0;
+    let lateDays = 0;
+    let absentDays = 0;
+    let totalElapsedDays = 0;
+
+    const cursor = new Date(effectiveStart);
+    while (cursor <= today) {
+      const dateStr = cursor.getFullYear() + "-" + String(cursor.getMonth() + 1).padStart(2, "0") + "-" + String(cursor.getDate()).padStart(2, "0");
+      const dayEntries = byDate[dateStr];
+      const isToday = cursor.getTime() === today.getTime();
+
+      // Skip today entirely from the tally if the day isn't over yet and
+      // nothing has been logged — it's "in progress", not absent.
+      if (isToday && !todayIsOver && (!dayEntries || dayEntries.length === 0)) {
+        cursor.setDate(cursor.getDate() + 1);
+        continue;
+      }
+
+      totalElapsedDays++;
+
+      if (dayEntries && dayEntries.length > 0) {
+        presentDays++;
+        if (dayEntries.some(function (e) { return e.isLate; })) {
+          lateDays++;
+        }
+      } else {
+        absentDays++;
+      }
+
+      cursor.setDate(cursor.getDate() + 1);
+    }
+
+    const attendancePct = totalElapsedDays > 0 ? Math.round((presentDays / totalElapsedDays) * 100) : 0;
+
+    return {
+      attendancePct: attendancePct,
+      present: presentDays,
+      late: lateDays,
+      absent: absentDays
+    };
+  }
+
+  function renderSummaryCard() {
+    const container = document.getElementById("summary-card-container");
+    const stats = calculateSummaryStats(activeSummaryRange);
+    const rangeLabel = formatRangeLabel(activeSummaryRange, new Date());
+
+    container.innerHTML =
+      '<div class="summary-range-label">' + rangeLabel + '</div>' +
+      '<div class="stat-grid">' +
+        '<div class="stat-card attendance">' +
+          '<div class="stat-icon">📈</div>' +
+          '<div class="stat-num">' + stats.attendancePct + '%</div>' +
+          '<div class="stat-label">Attendance</div>' +
+        '</div>' +
+        '<div class="stat-card present">' +
+          '<div class="stat-icon">✅</div>' +
+          '<div class="stat-num">' + stats.present + '</div>' +
+          '<div class="stat-label">Present</div>' +
+        '</div>' +
+        '<div class="stat-card late">' +
+          '<div class="stat-icon">⏰</div>' +
+          '<div class="stat-num">' + stats.late + '</div>' +
+          '<div class="stat-label">Late</div>' +
+        '</div>' +
+        '<div class="stat-card absent">' +
+          '<div class="stat-icon">⌛</div>' +
+          '<div class="stat-num">' + stats.absent + '</div>' +
+          '<div class="stat-label">Absent</div>' +
+        '</div>' +
+      '</div>';
+  }
+
+  // Tab switching for the summary range
+  document.querySelectorAll(".summary-tab").forEach(function (tab) {
+    tab.addEventListener("click", function () {
+      document.querySelectorAll(".summary-tab").forEach(function (t) { t.classList.remove("active"); });
+      tab.classList.add("active");
+      activeSummaryRange = tab.getAttribute("data-range");
+      renderSummaryCard();
+    });
+  });
+
   function formatLogDate(dateStr) {
     // dateStr is "YYYY-MM-DD"
     const [y, m, d] = dateStr.split("-").map(Number);
@@ -1107,8 +1563,10 @@
         const key = btn.getAttribute("data-key");
         deletePunchEntry(date, key);
         showToast("Naalis na sa log.");
+        renderSummaryCard();
         renderLog();
         renderHome();
+        scheduleCloudPush();
       });
     });
   }
@@ -1257,6 +1715,7 @@
           celebratePunchConfirmed(p.name);
           showToast(p.name + " naka-log na! ✓");
           renderHome();
+          scheduleCloudPush();
         });
       }
 
@@ -1273,15 +1732,75 @@
       document.getElementById("screen-" + target).classList.add("active");
       btn.classList.add("active");
       if (target === "home") renderHome();
-      if (target === "log") renderLog();
+      if (target === "log") {
+        renderSummaryCard();
+        renderLog();
+      }
     });
   });
+
+  // ---------- Sync UI wiring ----------
+  function setupSyncUI() {
+    const codeDisplay = document.getElementById("device-code-display");
+    codeDisplay.textContent = getDeviceCode();
+
+    document.getElementById("copy-code-btn").addEventListener("click", async function () {
+      const code = getDeviceCode();
+      try {
+        await navigator.clipboard.writeText(code);
+        showToast("Na-copy ang code: " + code);
+      } catch (err) {
+        // Clipboard API can fail on some browsers/contexts — fall back to a visible toast.
+        showToast("Code mo: " + code);
+      }
+    });
+
+    document.getElementById("link-code-btn").addEventListener("click", async function () {
+      const input = document.getElementById("link-code-input");
+      const code = input.value.trim().toLowerCase();
+      if (!code) {
+        showToast("I-type muna yung device code.");
+        return;
+      }
+
+      const success = await pullFromCloud(code);
+      if (success) {
+        setDeviceCode(code);
+        document.getElementById("device-code-display").textContent = code;
+        input.value = "";
+        populateSettingsForm();
+        schedule = loadSchedule();
+        renderHome();
+        renderSummaryCard();
+        subscribeToRealtimeSync();
+        showToast("Na-link sa ibang device mo! ✓");
+      }
+    });
+  }
 
   // ---------- Init ----------
   populateSettingsForm();
   renderHome();
   renderNotifBanner();
   setupServiceWorker();
+  setupSyncUI();
+  subscribeToRealtimeSync();
+
+  // On first load, try pulling anything already saved in the cloud for this
+  // device code (covers the case where the code was set up on another device
+  // and this is a fresh browser/profile that hasn't synced yet).
+  pullFromCloud(getDeviceCode()).then(function (found) {
+    if (found) {
+      populateSettingsForm();
+      schedule = loadSchedule();
+      renderHome();
+      renderSummaryCard();
+    } else {
+      // Nothing in the cloud yet for this code — push what we have locally
+      // (defaults or whatever's already stored) so the code becomes usable elsewhere.
+      pushToCloud();
+    }
+  });
 
   // Tick the hero countdown every second for a live "in Xm Xs" feel.
   setInterval(tickCountdown, 1000);
