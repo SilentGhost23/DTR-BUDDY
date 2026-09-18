@@ -170,6 +170,19 @@
   .t-status.pending { background: rgba(255,200,87,0.2); color: #A87A00; }
   .t-status.off { background: rgba(139,132,153,0.12); color: var(--muted); }
 
+  .t-item-disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+
+  .weekend-ot-hint {
+    font-size: 12px;
+    color: var(--muted);
+    text-align: center;
+    padding: 14px 8px 4px;
+    line-height: 1.5;
+  }
+
   .t-item.tappable { cursor: pointer; }
   .t-item.tappable:active { opacity: 0.7; }
   .t-status.confirm-btn {
@@ -1438,6 +1451,14 @@
         continue;
       }
 
+      // Weekends with no duty (no logged OT punches) aren't counted at all —
+      // no duty was expected, so it's neither present nor absent.
+      const weekendWithNoActivity = isWeekend(cursor) && (!dayEntries || dayEntries.length === 0);
+      if (weekendWithNoActivity) {
+        cursor.setDate(cursor.getDate() + 1);
+        continue;
+      }
+
       totalElapsedDays++;
 
       if (dayEntries && dayEntries.length > 0) {
@@ -1580,7 +1601,29 @@
     return hour12 + ":" + String(m).padStart(2, "0") + " " + period;
   }
 
+  function isWeekend(date) {
+    const day = date.getDay(); // 0 = Sunday, 6 = Saturday
+    return day === 0 || day === 6;
+  }
+
+  // A "duty day" is any weekday, or a weekend day where the user has
+  // explicitly turned on today's override (e.g. for OT).
+  function isDutyDay(dateStr) {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    const date = new Date(y, m - 1, d);
+
+    if (!isWeekend(date)) return true;
+
+    // Weekend: only a duty day if today's override is on AND set for this exact date.
+    return schedule.overrideToday && schedule.overrideDate === dateStr;
+  }
+
   function getTodaysPunches() {
+    // No duty today (weekend, no OT override) — nothing scheduled to punch.
+    if (!isDutyDay(todayStr())) {
+      return [];
+    }
+
     const effectiveTimeInAM = (schedule.overrideToday && schedule.overrideDate === todayStr())
       ? schedule.overrideTimeInAM
       : schedule.timeInAM;
@@ -1634,7 +1677,12 @@
     const now = new Date();
     const next = findNextPunch(now);
 
-    if (next) {
+    if (!isDutyDay(todayStr())) {
+      document.getElementById("hero-label").textContent = "Walang duty";
+      document.getElementById("hero-title").textContent = "Rest day mo ngayon";
+      document.getElementById("hero-time").textContent = "🌴";
+      document.getElementById("hero-countdown").textContent = "Enjoy your day off, pre!";
+    } else if (next) {
       document.getElementById("hero-label").textContent = "Next punch";
       document.getElementById("hero-title").textContent = next.name;
       document.getElementById("hero-time").textContent = to12Hour(next.time);
@@ -1662,6 +1710,7 @@
 
     const punches = getTodaysPunches();
     const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    const todayIsDuty = isDutyDay(todayStr());
 
     // Hero countdown (also refreshed every second by tickCountdown, but set it
     // immediately here too so there's no blank flash right after navigating).
@@ -1671,6 +1720,37 @@
     // Timeline list
     const timelineEl = document.getElementById("home-timeline");
     timelineEl.innerHTML = "";
+
+    if (!todayIsDuty) {
+      // Weekend, no OT override on — show the usual schedule as a grayed-out
+      // preview so the user still sees their normal times, just disabled.
+      const previewPunches = [
+        { name: "Time In (AM)", time: schedule.timeInAM },
+        { name: "Lunch Out", time: schedule.lunchOut },
+        { name: "Lunch In", time: schedule.lunchIn },
+        { name: "Time Out (PM)", time: schedule.timeOutPM }
+      ];
+      previewPunches.forEach(function (p) {
+        const item = document.createElement("div");
+        item.className = "t-item t-item-disabled";
+        item.innerHTML =
+          '<div class="t-dot pending"></div>' +
+          '<div class="t-info">' +
+            '<div class="t-name">' + p.name + '</div>' +
+            '<div class="t-time">' + to12Hour(p.time) + '</div>' +
+          '</div>' +
+          '<div class="t-status off">Walang duty</div>';
+        timelineEl.appendChild(item);
+      });
+
+      const hintEl = document.createElement("div");
+      hintEl.className = "weekend-ot-hint";
+      hintEl.textContent = "May OT ka ba ngayon? I-toggle ang \"Today's override\" sa Settings para gumana ang mga reminder.";
+      timelineEl.appendChild(hintEl);
+
+      return;
+    }
+
     punches.forEach(function (p) {
       const [h, m] = p.time.split(":").map(Number);
       const punchMinutes = h * 60 + m;
