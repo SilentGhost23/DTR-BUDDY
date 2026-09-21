@@ -1341,6 +1341,11 @@
   }
 
   // Records that a punch was confirmed right now, comparing against its scheduled time.
+  // Only these punch types are ever marked "late" — they're the two moments
+  // you're expected back at work (start of day, back from lunch). Lunch Out
+  // and Time Out (PM) are "leaving" punches and are never flagged late.
+  const LATE_CHECKED_PUNCH_KEYS = ["timeInAM", "lunchIn"];
+
   function confirmPunch(punchKey, punchName, scheduledTime) {
     const log = loadPunchLog();
     const date = todayStr();
@@ -1354,7 +1359,7 @@
     const confirmedAtMinutes = now.getHours() * 60 + now.getMinutes();
     const [sh, sm] = scheduledTime.split(":").map(Number);
     const scheduledMinutes = sh * 60 + sm;
-    const isLate = confirmedAtMinutes > scheduledMinutes;
+    const isLate = LATE_CHECKED_PUNCH_KEYS.includes(punchKey) && confirmedAtMinutes > scheduledMinutes;
 
     log.push({
       date: date,
