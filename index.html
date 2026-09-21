@@ -375,6 +375,68 @@
     margin-top: -8px;
   }
 
+  .custom-range-link {
+    background: none;
+    border: none;
+    color: var(--plum);
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 3px;
+    cursor: pointer;
+    padding: 0;
+    margin-bottom: 14px;
+    display: block;
+  }
+
+  .custom-range-panel {
+    background: white;
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 18px;
+  }
+  .custom-range-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+  .custom-range-field {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .custom-range-field label {
+    font-size: 11px;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .custom-range-field input[type="date"] {
+    font-family: 'Inter', sans-serif;
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--plum);
+    border: none;
+    background: var(--card);
+    border-radius: 10px;
+    padding: 8px 10px;
+    width: 100%;
+  }
+  .custom-range-apply-btn {
+    width: 100%;
+    background: var(--coral);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px;
+    font-family: 'Fredoka', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  .custom-range-apply-btn:active { opacity: 0.85; }
+
   .log-empty {
     text-align: center;
     color: var(--muted);
@@ -634,6 +696,23 @@
       <button class="summary-tab active" data-range="week">Weekly</button>
       <button class="summary-tab" data-range="month">Monthly</button>
       <button class="summary-tab" data-range="year">Yearly</button>
+      <button class="summary-tab" data-range="cutoff">Cutoff</button>
+    </div>
+
+    <button class="custom-range-link" id="custom-range-link">📅 Custom range</button>
+
+    <div class="custom-range-panel" id="custom-range-panel" style="display:none;">
+      <div class="custom-range-row">
+        <div class="custom-range-field">
+          <label>Mula</label>
+          <input type="date" id="custom-range-start">
+        </div>
+        <div class="custom-range-field">
+          <label>Hanggang</label>
+          <input type="date" id="custom-range-end">
+        </div>
+      </div>
+      <button class="custom-range-apply-btn" id="custom-range-apply-btn">I-apply</button>
     </div>
 
     <div id="summary-card-container"></div>
@@ -1362,6 +1441,8 @@
 
   // ---------- Log screen rendering ----------
   let activeSummaryRange = "week";
+  let customRangeStart = null; // "YYYY-MM-DD" when set
+  let customRangeEnd = null;
 
   function getRangeStartDate(range, now) {
     const start = new Date(now);
@@ -1380,7 +1461,59 @@
     return start;
   }
 
+  // Payroll cutoff periods: 11–25 of the same month, and 26 through the 10th
+  // of the following month. Returns the {start, end} pair that contains "now".
+  function getCutoffRange(now) {
+    const day = now.getDate();
+    const start = new Date(now);
+    const end = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+
+    if (day >= 11 && day <= 25) {
+      // Currently in the 11–25 period of this month.
+      start.setDate(11);
+      end.setDate(25);
+    } else if (day >= 26) {
+      // Currently in the 26 → 10 (next month) period.
+      start.setDate(26);
+      end.setMonth(end.getMonth() + 1, 10);
+    } else {
+      // day is 1–10, so we're in the tail end of last month's 26 → 10 period.
+      start.setMonth(start.getMonth() - 1, 26);
+      end.setDate(10);
+    }
+    return { start: start, end: end };
+  }
+
+  function getActiveRangeBounds(now) {
+    if (activeSummaryRange === "cutoff") {
+      return getCutoffRange(now);
+    }
+    if (activeSummaryRange === "custom" && customRangeStart && customRangeEnd) {
+      const start = new Date(customRangeStart + "T00:00:00");
+      const end = new Date(customRangeEnd + "T00:00:00");
+      return { start: start, end: end };
+    }
+    // week / month / year: start comes from getRangeStartDate, end is "today"
+    // (calculateSummaryStats already clamps to today internally).
+    const start = getRangeStartDate(activeSummaryRange, now);
+    const farFutureEnd = new Date(now);
+    farFutureEnd.setFullYear(farFutureEnd.getFullYear() + 1);
+    return { start: start, end: farFutureEnd };
+  }
+
   function formatRangeLabel(range, now) {
+    if (range === "cutoff") {
+      const { start, end } = getCutoffRange(now);
+      return start.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+    if (range === "custom" && customRangeStart && customRangeEnd) {
+      const start = new Date(customRangeStart + "T00:00:00");
+      const end = new Date(customRangeEnd + "T00:00:00");
+      return start.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    }
+
     const start = getRangeStartDate(range, now);
     if (range === "week") {
       const end = new Date(start);
@@ -1397,9 +1530,16 @@
   // counting only calendar days up to and including today (can't judge future days).
   function calculateSummaryStats(range) {
     const now = new Date();
-    const start = getRangeStartDate(range, now);
+    const bounds = getActiveRangeBounds(now);
+    const start = bounds.start;
     const today = new Date();
     today.setHours(0, 0, 0, 0);
+
+    // The tally never looks past today, and never past the range's own end
+    // (relevant for cutoff/custom ranges that may end in the past or future).
+    const rangeEnd = new Date(bounds.end);
+    rangeEnd.setHours(0, 0, 0, 0);
+    const tallyEnd = rangeEnd < today ? rangeEnd : today;
 
     const log = loadPunchLog();
     const byDate = {};
@@ -1439,7 +1579,7 @@
     let totalElapsedDays = 0;
 
     const cursor = new Date(effectiveStart);
-    while (cursor <= today) {
+    while (cursor <= tallyEnd) {
       const dateStr = cursor.getFullYear() + "-" + String(cursor.getMonth() + 1).padStart(2, "0") + "-" + String(cursor.getDate()).padStart(2, "0");
       const dayEntries = byDate[dateStr];
       const isToday = cursor.getTime() === today.getTime();
@@ -1520,8 +1660,45 @@
       document.querySelectorAll(".summary-tab").forEach(function (t) { t.classList.remove("active"); });
       tab.classList.add("active");
       activeSummaryRange = tab.getAttribute("data-range");
+      document.getElementById("custom-range-panel").style.display = "none";
       renderSummaryCard();
     });
+  });
+
+  // "Custom range" link toggles the date-picker panel open/closed.
+  document.getElementById("custom-range-link").addEventListener("click", function () {
+    const panel = document.getElementById("custom-range-panel");
+    const isOpen = panel.style.display !== "none";
+    panel.style.display = isOpen ? "none" : "block";
+
+    if (!isOpen) {
+      // Pre-fill with sensible defaults the first time it's opened.
+      const startInput = document.getElementById("custom-range-start");
+      const endInput = document.getElementById("custom-range-end");
+      if (!startInput.value) startInput.value = customRangeStart || todayStr();
+      if (!endInput.value) endInput.value = customRangeEnd || todayStr();
+    }
+  });
+
+  document.getElementById("custom-range-apply-btn").addEventListener("click", function () {
+    const startVal = document.getElementById("custom-range-start").value;
+    const endVal = document.getElementById("custom-range-end").value;
+
+    if (!startVal || !endVal) {
+      showToast("Pumili ng parehong petsa.");
+      return;
+    }
+    if (startVal > endVal) {
+      showToast("Dapat mauna yung 'Mula' sa 'Hanggang'.");
+      return;
+    }
+
+    customRangeStart = startVal;
+    customRangeEnd = endVal;
+    activeSummaryRange = "custom";
+
+    document.querySelectorAll(".summary-tab").forEach(function (t) { t.classList.remove("active"); });
+    renderSummaryCard();
   });
 
   function formatLogDate(dateStr) {
