@@ -304,7 +304,8 @@
 
   /* ---------- Summary tabs + stat cards (Log screen) ---------- */
   .summary-tabs {
-    display: flex;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
     background: var(--card);
     border-radius: 16px;
     padding: 4px;
@@ -318,7 +319,7 @@
     padding: 10px 0;
     border-radius: 12px;
     font-family: 'Inter', sans-serif;
-    font-size: 13px;
+    font-size: 12.5px;
     font-weight: 600;
     color: var(--muted);
     cursor: pointer;
@@ -348,6 +349,9 @@
   .stat-card.present { background: rgba(78,205,196,0.15); }
   .stat-card.late { background: rgba(255,200,87,0.22); }
   .stat-card.absent { background: rgba(255,107,107,0.15); }
+  .stat-card.hours { background: rgba(43,38,64,0.07); grid-column: 1 / -1; }
+  .stat-card.hours .stat-num { color: var(--plum); }
+  .stat-sub { font-size: 11px; color: var(--muted); }
 
   .stat-icon { font-size: 20px; }
   .stat-num {
@@ -696,7 +700,9 @@
       <button class="summary-tab active" data-range="week">Weekly</button>
       <button class="summary-tab" data-range="month">Monthly</button>
       <button class="summary-tab" data-range="year">Yearly</button>
-      <button class="summary-tab" data-range="cutoff">Cutoff</button>
+      <button class="summary-tab" data-range="cutoff">Auto Cutoff</button>
+      <button class="summary-tab" data-range="cut1126">11–26</button>
+      <button class="summary-tab" data-range="cut1025">10–25</button>
     </div>
 
     <button class="custom-range-link" id="custom-range-link">📅 Custom range</button>
@@ -798,6 +804,13 @@
           <div class="set-sub">Only applies today</div>
         </div>
         <input type="time" id="override-time-in" value="08:00">
+      </div>
+      <div class="set-row" id="override-ot-row">
+        <div>
+          <div class="set-label">OT today</div>
+          <div class="set-sub">Bilangin hanggang actual Time Out. Resets tomorrow</div>
+        </div>
+        <button class="toggle-btn off" id="toggle-ot" data-key="overrideOT"></button>
       </div>
     </div>
 
@@ -1032,7 +1045,9 @@
     lunchReminders: true,
     overrideToday: false,
     overrideDate: null,      // date string this override applies to, so it auto-resets
-    overrideTimeInAM: "08:00"
+    overrideTimeInAM: "08:00",
+    overrideOT: false,       // OT for today only (resets with the override)
+    otDates: []              // dates (YYYY-MM-DD) that were marked OT, kept for hour totals
   };
 
   // ---------- Storage helpers ----------
@@ -1068,6 +1083,7 @@
   // If an override was set for a previous day, it's expired — clear it.
   if (schedule.overrideToday && schedule.overrideDate !== todayStr()) {
     schedule.overrideToday = false;
+    schedule.overrideOT = false;
     saveSchedule(schedule);
   }
 
@@ -1084,6 +1100,7 @@
 
     document.getElementById("override-time-in").value = schedule.overrideTimeInAM;
     document.getElementById("override-time-row").style.display = schedule.overrideToday ? "flex" : "none";
+    setToggleState("toggle-ot", (schedule.otDates || []).indexOf(todayStr()) !== -1);
   }
 
   function setToggleState(id, isOn) {
@@ -1112,6 +1129,9 @@
 
   // Save button: read form, validate, persist, refresh Home
   document.getElementById("save-schedule-btn").addEventListener("click", function () {
+    const otOn = getToggleState("toggle-ot");
+    const otDates = (schedule.otDates || []).filter(function (d) { return d !== todayStr(); });
+    if (otOn) otDates.push(todayStr());
     const updated = {
       timeInAM: document.getElementById("sched-time-in-am").value || DEFAULT_SCHEDULE.timeInAM,
       lunchOut: document.getElementById("sched-lunch-out").value || DEFAULT_SCHEDULE.lunchOut,
@@ -1121,7 +1141,9 @@
       lunchReminders: getToggleState("toggle-lunch-reminders"),
       overrideToday: getToggleState("toggle-override"),
       overrideDate: getToggleState("toggle-override") ? todayStr() : null,
-      overrideTimeInAM: document.getElementById("override-time-in").value || DEFAULT_SCHEDULE.overrideTimeInAM
+      overrideTimeInAM: document.getElementById("override-time-in").value || DEFAULT_SCHEDULE.overrideTimeInAM,
+      overrideOT: otOn,
+      otDates: otDates
     };
 
     schedule = updated;
@@ -1491,7 +1513,35 @@
     return { start: start, end: end };
   }
 
+  // Fixed-day cutoff (e.g. 11–26, 10–25). If today is inside [from, to], that's
+  // the current period; otherwise the period is the gap that follows `to`
+  // (to+1 of one month through from-1 of the next). It rolls over by itself.
+  function getFixedCutoffRange(now, from, to) {
+    const day = now.getDate();
+    const start = new Date(now);
+    const end = new Date(now);
+    start.setHours(0, 0, 0, 0);
+    end.setHours(0, 0, 0, 0);
+
+    if (day >= from && day <= to) {
+      start.setDate(from);
+      end.setDate(to);
+    } else if (day > to) {
+      start.setDate(to + 1);
+      end.setMonth(end.getMonth() + 1, from - 1);
+    } else {
+      start.setMonth(start.getMonth() - 1, to + 1);
+      end.setDate(from - 1);
+    }
+    return { start: start, end: end };
+  }
+
+  const FIXED_CUTOFFS = { cut1126: [11, 26], cut1025: [10, 25] };
+
   function getActiveRangeBounds(now) {
+    if (FIXED_CUTOFFS[activeSummaryRange]) {
+      return getFixedCutoffRange(now, FIXED_CUTOFFS[activeSummaryRange][0], FIXED_CUTOFFS[activeSummaryRange][1]);
+    }
     if (activeSummaryRange === "cutoff") {
       return getCutoffRange(now);
     }
@@ -1509,6 +1559,10 @@
   }
 
   function formatRangeLabel(range, now) {
+    if (FIXED_CUTOFFS[range]) {
+      const b = getFixedCutoffRange(now, FIXED_CUTOFFS[range][0], FIXED_CUTOFFS[range][1]);
+      return b.start.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + b.end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
     if (range === "cutoff") {
       const { start, end } = getCutoffRange(now);
       return start.toLocaleDateString("en-US", { month: "short", day: "numeric" }) + " – " + end.toLocaleDateString("en-US", { month: "short", day: "numeric" });
@@ -1628,9 +1682,67 @@
     };
   }
 
+  // ---------- Total hours ----------
+  function timeToMinutes(t) {
+    const parts = t.split(":").map(Number);
+    return parts[0] * 60 + parts[1];
+  }
+
+  function dateToStr(d) {
+    return d.getFullYear() + "-" + String(d.getMonth() + 1).padStart(2, "0") + "-" + String(d.getDate()).padStart(2, "0");
+  }
+
+  // Minutes worked for one day:
+  //  - start = later of actual / fixed Time In (early counts as fixed, late as actual)
+  //  - no lunch deduction
+  //  - end = actual Time Out if earlier than the fixed Time Out; capped at the fixed
+  //    Time Out unless the day is marked OT (then actual); if Time Out was forgotten,
+  //    the fixed Time Out from Settings is used
+  function calculateDayMinutes(dateStr, entries) {
+    const inEntry = entries.find(function (e) { return e.punchKey === "timeInAM"; });
+    if (!inEntry) return 0;
+
+    const start = Math.max(timeToMinutes(inEntry.confirmedTime), timeToMinutes(inEntry.scheduledTime));
+    const outEntry = entries.find(function (e) { return e.punchKey === "timeOutPM"; });
+    const fixedOut = timeToMinutes(outEntry ? outEntry.scheduledTime : schedule.timeOutPM);
+    const isOT = (schedule.otDates || []).indexOf(dateStr) !== -1;
+
+    let end;
+    if (outEntry) {
+      const actualOut = timeToMinutes(outEntry.confirmedTime);
+      end = isOT ? actualOut : Math.min(actualOut, fixedOut);
+    } else {
+      end = fixedOut;
+      if (dateStr === todayStr()) {
+        const n = new Date();
+        end = Math.min(end, n.getHours() * 60 + n.getMinutes());
+      }
+    }
+    return Math.max(0, end - start);
+  }
+
+  function calculateTotalMinutes(bounds) {
+    const startStr = dateToStr(bounds.start);
+    const endStr = dateToStr(bounds.end);
+    const byDate = {};
+    loadPunchLog().forEach(function (e) {
+      if (e.date < startStr || e.date > endStr) return;
+      if (!byDate[e.date]) byDate[e.date] = [];
+      byDate[e.date].push(e);
+    });
+    let total = 0;
+    Object.keys(byDate).forEach(function (d) { total += calculateDayMinutes(d, byDate[d]); });
+    return total;
+  }
+
+  function formatHours(totalMinutes) {
+    return Math.floor(totalMinutes / 60) + "h " + String(totalMinutes % 60).padStart(2, "0") + "m";
+  }
+
   function renderSummaryCard() {
     const container = document.getElementById("summary-card-container");
     const stats = calculateSummaryStats(activeSummaryRange);
+    const totalMinutes = calculateTotalMinutes(getActiveRangeBounds(new Date()));
     const rangeLabel = formatRangeLabel(activeSummaryRange, new Date());
 
     container.innerHTML =
@@ -1656,6 +1768,11 @@
           '<div class="stat-num">' + stats.absent + '</div>' +
           '<div class="stat-label">Absent</div>' +
         '</div>' +
+        '<div class="stat-card hours">' +
+          '<div class="stat-icon">🕒</div>' +
+          '<div class="stat-num">' + formatHours(totalMinutes) + '</div>' +
+          '<div class="stat-label">Total Hours</div>' +
+        '</div>' +
       '</div>';
   }
 
@@ -1667,6 +1784,7 @@
       activeSummaryRange = tab.getAttribute("data-range");
       document.getElementById("custom-range-panel").style.display = "none";
       renderSummaryCard();
+      renderLog();
     });
   });
 
@@ -1704,6 +1822,7 @@
 
     document.querySelectorAll(".summary-tab").forEach(function (t) { t.classList.remove("active"); });
     renderSummaryCard();
+    renderLog();
   });
 
   function formatLogDate(dateStr) {
@@ -1718,7 +1837,21 @@
 
   function renderLog() {
     const logListEl = document.getElementById("log-list");
-    const entries = loadPunchLog();
+    let entries = loadPunchLog();
+
+    // 11–26 / 10–25 tabs: history only shows days inside that cutoff.
+    // Weekly / Monthly / Yearly / Auto Cutoff / Custom show everything as before.
+    if (FIXED_CUTOFFS[activeSummaryRange]) {
+      const b = getActiveRangeBounds(new Date());
+      const startStr = dateToStr(b.start);
+      const endStr = dateToStr(b.end);
+      const all = entries;
+      entries = all.filter(function (e) { return e.date >= startStr && e.date <= endStr; });
+      if (entries.length === 0 && all.length > 0) {
+        logListEl.innerHTML = '<div class="log-empty">Wala pang punch sa cutoff na ito.</div>';
+        return;
+      }
+    }
 
     if (entries.length === 0) {
       logListEl.innerHTML = '<div class="log-empty">Wala ka pang na-cconfirm na punch.<br>Pag na-tap mo yung reminder o yung schedule sa Home, dito lalabas ang history mo.</div>';
