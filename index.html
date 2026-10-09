@@ -324,6 +324,9 @@
     color: var(--muted);
     cursor: pointer;
   }
+  .tab-main { display: block; }
+  .tab-sub { display: block; font-size: 9.5px; font-weight: 500; margin-top: 2px; opacity: 0.75; }
+  .tab-sub:empty { display: none; }
   .summary-tab.active {
     background: white;
     color: var(--plum);
@@ -701,8 +704,8 @@
       <button class="summary-tab" data-range="month">Monthly</button>
       <button class="summary-tab" data-range="year">Yearly</button>
       <button class="summary-tab" data-range="cutoff">Auto Cutoff</button>
-      <button class="summary-tab" data-range="cut1126">11–26</button>
-      <button class="summary-tab" data-range="cut1025">10–25</button>
+      <button class="summary-tab" data-range="cut2610"><span class="tab-main">26–10</span><span class="tab-sub" id="tab-sub-cut2610"></span></button>
+      <button class="summary-tab" data-range="cut1125"><span class="tab-main">11–25</span><span class="tab-sub" id="tab-sub-cut1125"></span></button>
     </div>
 
     <button class="custom-range-link" id="custom-range-link">📅 Custom range</button>
@@ -1513,30 +1516,36 @@
     return { start: start, end: end };
   }
 
-  // Fixed-day cutoff (e.g. 11–26, 10–25). If today is inside [from, to], that's
-  // the current period; otherwise the period is the gap that follows `to`
-  // (to+1 of one month through from-1 of the next). It rolls over by itself.
+  // Fixed-day cutoffs: 26–10 (26th of one month through the 10th of the next)
+  // and 11–25. Shows the cutoff that contains today; if today is between
+  // cutoffs, it shows the one that just ended. Rolls over by itself.
   function getFixedCutoffRange(now, from, to) {
     const day = now.getDate();
-    const start = new Date(now);
-    const end = new Date(now);
-    start.setHours(0, 0, 0, 0);
-    end.setHours(0, 0, 0, 0);
-
-    if (day >= from && day <= to) {
-      start.setDate(from);
-      end.setDate(to);
-    } else if (day > to) {
-      start.setDate(to + 1);
-      end.setMonth(end.getMonth() + 1, from - 1);
-    } else {
-      start.setMonth(start.getMonth() - 1, to + 1);
-      end.setDate(from - 1);
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const startMonth = day >= from ? m : m - 1;
+    const start = new Date(y, startMonth, from);
+    const end = from <= to ? new Date(y, startMonth, to) : new Date(y, startMonth + 1, to);
+    if (from <= to && day > to) {
+      // between 11–25 and the next one: the one that just ended is this month's
+      return { start: new Date(y, m, from), end: new Date(y, m, to) };
+    }
+    if (from > to && day > to && day < from) {
+      // 11–25 stretch: the 26–10 that just ended
+      return { start: new Date(y, m - 1, from), end: new Date(y, m, to) };
     }
     return { start: start, end: end };
   }
 
-  const FIXED_CUTOFFS = { cut1126: [11, 26], cut1025: [10, 25] };
+  const FIXED_CUTOFFS = { cut2610: [26, 10], cut1125: [11, 25] };
+
+  function updateCutoffTabLabels() {
+    Object.keys(FIXED_CUTOFFS).forEach(function (key) {
+      const b = getFixedCutoffRange(new Date(), FIXED_CUTOFFS[key][0], FIXED_CUTOFFS[key][1]);
+      const fmt = function (d) { return d.toLocaleDateString("en-US", { month: "short", day: "numeric" }); };
+      document.getElementById("tab-sub-" + key).textContent = fmt(b.start) + "–" + fmt(b.end);
+    });
+  }
 
   function getActiveRangeBounds(now) {
     if (FIXED_CUTOFFS[activeSummaryRange]) {
@@ -1745,8 +1754,9 @@
     const totalMinutes = calculateTotalMinutes(getActiveRangeBounds(new Date()));
     const rangeLabel = formatRangeLabel(activeSummaryRange, new Date());
 
+    updateCutoffTabLabels();
     container.innerHTML =
-      '<div class="summary-range-label">' + rangeLabel + '</div>' +
+      (activeSummaryRange === "custom" ? '<div class="summary-range-label">' + rangeLabel + '</div>' : '') +
       '<div class="stat-grid">' +
         '<div class="stat-card attendance">' +
           '<div class="stat-icon">📈</div>' +
